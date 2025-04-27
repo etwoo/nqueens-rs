@@ -1,3 +1,6 @@
+// https://github.com/taiki-e/cargo-llvm-cov#exclude-code-from-coverage
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
 pub struct BoardSolution {
     positions: Vec<usize>,
 }
@@ -13,7 +16,7 @@ impl BoardSolution {
                 let val = if col == queen_of_this_row { "Q" } else { "_" };
                 print!("{:2}", val);
             }
-            println!("");
+            println!();
         }
     }
 }
@@ -70,9 +73,7 @@ impl BoardState {
                 continue;
             }
             // Check if existing queen hits this position on a diagonal
-            if queen > cur && queen - cur == distance {
-                return false;
-            } else if queen < cur && cur - queen == distance {
+            if queen.abs_diff(cur) == distance {
                 return false;
             }
         }
@@ -125,15 +126,13 @@ impl BoardState {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
     use rayon::prelude::*;
 
     fn solve(n: usize) -> Option<BoardSolution> {
-        for solution in setup(n).into_iter().flatten() {
-            return Some(solution);
-        }
-        None
+        setup(n).into_iter().flatten().next()
     }
 
     fn count(n: usize) -> usize {
@@ -142,6 +141,17 @@ mod tests {
 
     fn count_with_threads(n: usize) -> usize {
         setup(n).into_par_iter().map(|x| x.count()).sum()
+    }
+
+    #[test]
+    fn smoke_test_board_solution_struct() {
+        match solve(1) {
+            Some(solution) => {
+                assert_eq!(solution.n(), 1);
+                solution.print_solution();
+            }
+            None => println!("skipping smoke test on unexpected None"),
+        }
     }
 
     #[test]

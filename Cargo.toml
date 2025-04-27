@@ -7,3 +7,6 @@ edition = "2024"
 
 [dev-dependencies]
 rayon = "1.10"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
