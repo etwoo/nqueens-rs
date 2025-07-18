@@ -1,3 +1,6 @@
+// https://github.com/rust-lang/rust/issues/43122
+// https://github.com/rust-lang/rust/issues/117078
+#![feature(gen_blocks, yield_expr)]
 // https://github.com/taiki-e/cargo-llvm-cov#exclude-code-from-coverage
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
@@ -14,115 +17,61 @@ impl BoardSolution {
         for &queen_of_this_row in self.positions.iter() {
             for col in 0..self.n() {
                 let val = if col == queen_of_this_row { "Q" } else { "_" };
-                print!("{:2}", val);
+                print!("{val:2}");
             }
             println!();
         }
     }
 }
 
-pub struct BoardState {
-    n: usize,
-    cursor: Vec<usize>,
-    end: Vec<usize>,
+pub fn setup(n: usize) -> impl Iterator<Item = BoardSolution> {
+    (0..n).flat_map(move |pos| make_solver(n, pos))
 }
 
-impl Iterator for BoardState {
-    type Item = BoardSolution;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.choose()
+fn make_solver(n: usize, pos: usize) -> impl Iterator<Item = BoardSolution> {
+    gen move {
+        let mut cursor = vec![pos];
+        let end = vec![pos + 1];
+        while let Some(&col) = cursor.last()
+            && cursor != end
+        {
+            let backtrack = if n == cursor.len() - 1 {
+                yield BoardSolution {
+                    positions: cursor.clone().into_iter().take(n).collect(),
+                };
+                // Backtrack after yielding a solution
+                true
+            } else {
+                // Backtrack if done checking all columns in this row
+                n == col
+            };
+
+            if backtrack {
+                cursor.pop();
+                next_column(&mut cursor);
+            } else if is_position_eligible_for_queen(col, &cursor) {
+                // Choose current column for this row, and go to the next row
+                cursor.push(0);
+            } else {
+                next_column(&mut cursor);
+            }
+        }
     }
 }
 
-pub fn setup(n: usize) -> Vec<BoardState> {
-    let mut v = Vec::new();
-    for pos in 0..n {
-        let b = BoardState {
-            n,
-            cursor: vec![pos],
-            end: vec![pos + 1],
-        };
-        v.push(b);
+fn next_column(cursor: &mut [usize]) {
+    if let Some(col) = cursor.last_mut() {
+        *col += 1;
     }
-    v
 }
 
-impl BoardState {
-    fn cursor_at_row(&self) -> usize {
-        assert!(!self.cursor.is_empty());
-        self.cursor.len() - 1
-    }
-
-    fn cursor_at_col(&self) -> usize {
-        assert!(!self.cursor.is_empty());
-        *self.cursor.last().unwrap()
-    }
-
-    fn is_cursor_eligible_for_queen(&self) -> bool {
-        assert!(!self.cursor.is_empty());
-        let cur = self.cursor_at_col();
-        let n_to_take = self.cursor.len() - 1;
-        if self.cursor.iter().take(n_to_take).any(|&x| x == cur) {
-            // Existing queen already occupies this column
-            return false;
-        }
-        for (distance, &queen) in self.cursor.iter().rev().enumerate() {
-            if distance == 0 {
-                // Don't consider `cur` as conflicting with itself
-                assert_eq!(queen, cur);
-                continue;
-            }
-            // Check if existing queen hits this position on a diagonal
-            if queen.abs_diff(cur) == distance {
-                return false;
-            }
-        }
-        true
-    }
-
-    fn move_cursor_to_next_column(&mut self) {
-        assert!(!self.cursor.is_empty());
-        // Caller must check if we've exceeded `self.n`!
-        *self.cursor.last_mut().unwrap() += 1;
-    }
-
-    fn move_cursor_to_next_row_first_column(&mut self) {
-        self.cursor.push(0);
-    }
-
-    fn prepare_cursor_for_next(&mut self) {
-        assert!(!self.cursor.is_empty());
-        self.cursor.pop();
-        self.move_cursor_to_next_column();
-    }
-
-    fn choose(&mut self) -> Option<BoardSolution> {
-        loop {
-            if self.cursor == self.end {
-                return None;
-            }
-
-            if self.cursor_at_col() == self.n {
-                self.prepare_cursor_for_next();
-                continue;
-            }
-
-            if self.cursor_at_row() == self.n {
-                let v = self.cursor.to_vec(); // deepcopy before cursor movement
-                self.prepare_cursor_for_next();
-                return Some(BoardSolution {
-                    positions: v.into_iter().take(self.cursor.len()).collect(),
-                });
-            }
-
-            if self.is_cursor_eligible_for_queen() {
-                self.move_cursor_to_next_row_first_column();
-                continue;
-            }
-
-            self.move_cursor_to_next_column();
-        }
-    }
+fn is_position_eligible_for_queen(candidate: usize, cursor: &[usize]) -> bool {
+    let mut cols = cursor.iter().take(cursor.len() - 1);
+    let eligible_column = cols.all(|&queen| queen != candidate);
+    let mut diags = cursor.iter().rev().enumerate().skip(1);
+    let eligible_diagonal =
+        diags.all(|(distance, &queen)| queen.abs_diff(candidate) != distance);
+    eligible_column && eligible_diagonal
 }
 
 #[cfg(test)]
@@ -132,15 +81,18 @@ mod tests {
     use rayon::prelude::*;
 
     fn solve(n: usize) -> Option<BoardSolution> {
-        setup(n).into_iter().flatten().next()
+        setup(n).next()
     }
 
     fn count(n: usize) -> usize {
-        setup(n).into_iter().map(|x| x.count()).sum()
+        setup(n).count()
     }
 
     fn count_with_threads(n: usize) -> usize {
-        setup(n).into_par_iter().map(|x| x.count()).sum()
+        (0..n)
+            .into_par_iter()
+            .map(|pos| make_solver(n, pos).count())
+            .sum()
     }
 
     #[test]

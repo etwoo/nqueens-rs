@@ -17,16 +17,16 @@ fn main() -> ExitCode {
     };
 
     let mut solution_count = 0;
-    for solution in nqueens::setup(n).into_iter().flatten() {
+    for solution in nqueens::setup(n) {
         solution_count += 1;
         println!("Got solution {} for n={}", solution_count, solution.n());
         solution.print_solution();
     }
 
     if solution_count == 0 {
-        println!("No solution for n={}", n);
+        println!("No solution for n={n}");
     } else {
-        println!("Found {} solutions for n={}", solution_count, n);
+        println!("Found {solution_count} solutions for n={n}");
     }
 
     ExitCode::SUCCESS
