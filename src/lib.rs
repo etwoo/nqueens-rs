@@ -28,33 +28,31 @@ pub fn setup(n: usize) -> impl Iterator<Item = BoardSolution> {
     (0..n).flat_map(move |pos| make_solver(n, pos))
 }
 
-fn make_solver(n: usize, pos: usize) -> impl Iterator<Item = BoardSolution> {
-    gen move {
-        let mut cursor = vec![pos];
-        let end = vec![pos + 1];
-        while let Some(&col) = cursor.last()
-            && cursor != end
-        {
-            let backtrack = if n == cursor.len() - 1 {
-                yield BoardSolution {
-                    positions: cursor.clone().into_iter().take(n).collect(),
-                };
-                // Backtrack after yielding a solution
-                true
-            } else {
-                // Backtrack if done checking all columns in this row
-                n == col
+gen fn make_solver(n: usize, pos: usize) -> BoardSolution {
+    let mut cursor = vec![pos];
+    let end = vec![pos + 1];
+    while let Some(&col) = cursor.last()
+        && cursor != end
+    {
+        let backtrack = if n == cursor.len() - 1 {
+            yield BoardSolution {
+                positions: cursor.clone().into_iter().take(n).collect(),
             };
+            // Backtrack after yielding a solution
+            true
+        } else {
+            // Backtrack if done checking all columns in this row
+            n == col
+        };
 
-            if backtrack {
-                cursor.pop();
-                next_column(&mut cursor);
-            } else if is_position_eligible_for_queen(col, &cursor) {
-                // Choose current column for this row, and go to the next row
-                cursor.push(0);
-            } else {
-                next_column(&mut cursor);
-            }
+        if backtrack {
+            cursor.pop();
+            next_column(&mut cursor);
+        } else if is_position_eligible_for_queen(col, &cursor) {
+            // Choose current column for this row, and go to the next row
+            cursor.push(0);
+        } else {
+            next_column(&mut cursor);
         }
     }
 }
