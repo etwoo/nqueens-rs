@@ -17,7 +17,7 @@ fn main() -> ExitCode {
     };
 
     let mut solution_count = 0;
-    for solution in nqueens::setup(n) {
+    for solution in nqueens::iter(n) {
         solution_count += 1;
         println!("Got solution {} for n={}", solution_count, solution.n());
         solution.print_solution();

@@ -24,13 +24,13 @@ impl BoardSolution {
     }
 }
 
-pub fn setup(n: usize) -> impl Iterator<Item = BoardSolution> {
-    (0..n).flat_map(move |pos| make_solver(n, pos))
+pub fn iter(n: usize) -> impl Iterator<Item = BoardSolution> {
+    (0..n).flat_map(move |x| chunk(n, x))
 }
 
-gen fn make_solver(n: usize, pos: usize) -> BoardSolution {
-    let mut cursor = vec![pos];
-    let end = vec![pos + 1];
+gen fn chunk(n: usize, start: usize) -> BoardSolution {
+    let mut cursor = vec![start];
+    let end = vec![start + 1];
     while let Some(&col) = cursor.last()
         && cursor != end
     {
@@ -79,18 +79,15 @@ mod tests {
     use rayon::prelude::*;
 
     fn solve(n: usize) -> Option<BoardSolution> {
-        setup(n).next()
+        iter(n).next()
     }
 
     fn count(n: usize) -> usize {
-        setup(n).count()
+        iter(n).count()
     }
 
     fn count_with_threads(n: usize) -> usize {
-        (0..n)
-            .into_par_iter()
-            .map(|pos| make_solver(n, pos).count())
-            .sum()
+        (0..n).into_par_iter().map(|x| chunk(n, x).count()).sum()
     }
 
     #[test]
